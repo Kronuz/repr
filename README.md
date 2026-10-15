@@ -1,5 +1,7 @@
 # repr
 
+[![CI](https://github.com/Kronuz/repr/actions/workflows/ci.yml/badge.svg)](https://github.com/Kronuz/repr/actions/workflows/ci.yml)
+
 A small C++20 utility that turns an arbitrary byte buffer into a single-line,
 printable, copy-pasteable string. Extracted from
 [Xapiand](https://github.com/Kronuz/Xapiand).
