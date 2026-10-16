@@ -14,7 +14,9 @@ test/test.cc                 Runnable smoke test: passthrough, escapes, hex, quo
 examples/demo.cc             A runnable tour (not a test).
 CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest test `repr`.
 LICENSE                      MIT, Copyright (c) 2015-2019 Dubalu LLC.
-README.md                    What it is, install, usage, API.
+README.md                    What it is, install, quick start.
+docs/API.md                  The API reference.
+docs/repr.d2                 The README diagram's source (docs/repr.svg is rendered from it).
 ARCHITECTURE.md              Internal design of the escaping pass, sizing, quoting, truncation.
 ```
 

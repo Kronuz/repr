@@ -1,0 +1,11 @@
+# repr: raw bytes in, one printable line out.
+# Render: d2 --layout elk --sketch --theme 302 docs/repr.d2 docs/repr.svg
+direction: right
+
+raw: bytes {
+  label: "a ⏎ b ESC NUL 0xff\n(6 raw bytes)"
+}
+out: repr {
+  label: "'a\\nb\\x1b\\x00\\xff'\n(safe to print and paste)"
+}
+raw -> out: "repr()"
