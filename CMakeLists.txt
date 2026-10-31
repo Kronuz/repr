@@ -38,6 +38,24 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   target_link_libraries(repr_test PRIVATE repr)
   add_test(NAME repr COMMAND repr_test)
 
+  # Differential test against the frozen pre-optimization implementation.
+  add_executable(repr_diff_test test/diff_test.cc test/repr_old.cc)
+  target_link_libraries(repr_diff_test PRIVATE repr)
+  add_test(NAME repr_diff COMMAND repr_diff_test)
+
+  # Benchmark (not run by ctest): old vs new, plus absl::CEscape when abseil is
+  # installed. The comparator is optional and never a dependency of the library.
+  option(REPR_BUILD_BENCH "Build bench/bench.cc" OFF)
+  if(REPR_BUILD_BENCH)
+    add_executable(repr_bench bench/bench.cc test/repr_old.cc)
+    target_link_libraries(repr_bench PRIVATE repr)
+    find_package(absl QUIET)
+    if(absl_FOUND)
+      target_compile_definitions(repr_bench PRIVATE HAVE_ABSL=1)
+      target_link_libraries(repr_bench PRIVATE absl::strings)
+    endif()
+  endif()
+
   # A runnable tour of the library (not a test): build & run ./build/repr_demo
   add_executable(repr_demo examples/demo.cc)
   target_link_libraries(repr_demo PRIVATE repr)

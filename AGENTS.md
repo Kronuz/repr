@@ -9,7 +9,7 @@ easy to fall into.
 
 ```
 repr.hh                      Declares repr() and the convenience overloads (void*+size, range, string, string_view, array). Header. Verbatim from Xapiand.
-repr.cc                      The one compiled function: pre-sized single-pass escaping loop. Includes "chars.hh" for chars::char_repr. Verbatim from Xapiand.
+repr.cc                      The one compiled function: length tables, exact-size result, 8-byte block copy. Includes "chars.hh" for chars::char_repr. Verbatim from Xapiand.
 test/test.cc                 Runnable smoke test: passthrough, escapes, hex, quote modes, non-friendly, NULs, overloads, truncation.
 examples/demo.cc             A runnable tour (not a test).
 CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest test `repr`.
@@ -58,12 +58,13 @@ dependency; there was no `log.h` / opts / config coupling in the original.
 
 ## Load-bearing invariants
 
-- **The output buffer is pre-sized to the worst case, then trimmed.** `repr.cc`
-  allocates `size * 4 + 2` (or the truncation-adjusted size) before the loop and
-  writes through a raw `char*` with no bounds checks, then does a final
-  `resize(d - buff)`. If you add a new escape that can emit more than four bytes
-  for a single input byte, you must grow the pre-size accordingly or you will
-  write out of bounds. This is the single most dangerous thing to touch.
+- **The output buffer is sized exactly, from the same table that writes it.**
+  `repr.cc` measures the kept bytes with the length table, calls `ret.resize(n)`
+  once and writes through a raw `char*` with no bounds checks (an `assert` checks
+  that the writer produced exactly `n` bytes). If you add or change an escape you
+  must change the table (`make_tab`) and the writer (`emit_byte`) together, and
+  the SWAR test (`dirty8`) if the set of "plain" bytes changes. Writing more than
+  the table says is a heap overflow.
 - **`repr` is size-based, not NUL-terminated.** It renders exactly `size` bytes,
   including any embedded `\0` (as `\x00`). Don't "optimize" it to stop at a NUL.
   The array overload deliberately passes `N - 1` to drop only a *string literal's*
@@ -74,25 +75,29 @@ dependency; there was no `log.h` / opts / config coupling in the original.
 - **Hex rendering is delegated to `chars::char_repr`.** Two lowercase hex digits,
   written through the cursor, advancing it by two. Don't inline a second hex table
   here; keep it coming from char-classify so the two libraries agree.
+- **Behavior is pinned by `test/diff_test.cc`.** It compares `repr()` with a frozen
+  copy of the previous implementation (`test/repr_old.cc`) over random and edge
+  inputs, every quote mode and `max_size` values around the truncation window.
+  The one deliberate difference is `max_size == 1` with a quote (see ARCHITECTURE).
 
 ## How to extend
 
 - **Add a named escape (e.g. `\a`, `\v`).** There are commented-out cases in the
   `friendly` switch for exactly this. Uncommenting one is safe because `\a` is two
   output bytes, well under the four-byte `\xNN` worst case the buffer is sized for.
-  Adding an escape *longer* than four bytes means growing the pre-size.
+  An escape *longer* than four bytes needs a wider length table entry.
 - **Always extend the smoke test.** `test/test.cc` is the only executable check.
   Add a case for any new escape or mode and assert the exact string.
 
 ## Traps
 
-- **The truncation window is pointer arithmetic into the input.** `max_a` / `max_b`
-  split the budget head/tail; the loop emits `...` exactly when the read cursor
-  first reaches `max_a`. Off-by-one edits here either drop the dots or mis-place
+- **The truncation window is pointer arithmetic into the input.** `lo` / `hi`
+  (in `repr()`) split the budget head/tail; the dots are written where the 1-based
+  position `lo` falls. Off-by-one edits here either drop the dots or mis-place
   them. With `max_size == 0` the window is set so nothing is skipped; preserve that.
 - **`char_repr` advances the write pointer by two.** It takes a `char**`. The
-  pre-sizing already budgets for it, but if you call it from a new path make sure
-  the cursor has room.
+  measuring pass already counts those bytes (length 4 per `\xNN`), but if you call
+  it from a new path make sure the result was sized for it.
 - **High bytes (>= 0x7f) are escaped, not interpreted.** This is an ASCII-oriented,
   byte-faithful renderer, not a Unicode display. Don't add multibyte decoding.
 
@@ -100,7 +105,7 @@ dependency; there was no `log.h` / opts / config coupling in the original.
 
 This is a standalone extraction from
 [Xapiand](https://github.com/Kronuz/Xapiand). `repr.hh` and `repr.cc` were copied
-verbatim; the only change on extraction was resolving the one local include,
+verbatim, and `repr.cc` has since been rewritten for speed (the old version lives on as `test/repr_old.cc`, the test oracle); the only change on extraction was resolving the one local include,
 `"chars.hh"`, against the standalone char-classify library through CMake instead
-of Xapiand's source tree. There is no source decoupling delta. Keep it that way;
-any change here should be reconcilable with upstream as a plain edit.
+of Xapiand's source tree. There is no source decoupling delta. Keep the header and the
+behavior reconcilable with upstream.

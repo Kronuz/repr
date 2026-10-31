@@ -22,21 +22,22 @@ literal's trailing NUL.
 
 ## The escaping pass
 
-The core function walks the buffer once, byte by byte, writing into a
-pre-allocated output buffer. There is no reallocation in the loop: the output is
-sized up front to the worst case before the first byte is written.
+The output is allocated once at its exact size and then written through a raw
+`char*` cursor. There is no reallocation and no zero-fill of a worst-case buffer.
 
-The worst case is four output bytes per input byte (`\xNN`), plus the two quotes:
+1. **Length table.** A 256-entry table (one per quote mode: none, `'`, `"`) gives
+   the output length of each byte: 1 (copied as is), 2 (`\n`, `\r`, `\t`, `\\`,
+   the active quote) or 4 (`\xNN`).
+2. **Measure.** The first pass sums the table lengths over the kept bytes, so
+   `ret.resize(n)` is exact (plus the two quotes and the `...`, when present).
+3. **Write.** The second pass handles eight bytes at a time: one 64-bit load is
+   tested (SWAR) for "no byte below 0x20 or at/above 0x7f, no backslash, no
+   quote". A clean block is copied with one 8-byte store; any other block goes
+   byte by byte through the table. Escape-heavy input therefore pays one extra
+   test per eight bytes, and printable text copies at memory speed.
 
-```cpp
-size = size * 4 + 2;            // every byte as \xNN, plus two quotes
-```
-
-When `max_size` is set, the budget is split into a head and a tail and the sizing
-accounts for the `...` and the dropped middle instead. The buffer is allocated
-with `ret.resize(size)`, written through a raw `char*` cursor, then trimmed with a
-final `ret.resize(d - buff)` to the bytes actually produced. Pre-sizing to the
-worst case is what lets the loop use a bare pointer with no bounds checks.
+`friendly == false` skips the tables: every kept byte is `\xNN`, so the size is
+`4 * kept bytes` and the pass is a straight hex write.
 
 ## What each byte becomes
 
@@ -77,18 +78,22 @@ those are the only values the escaping logic is written for.
 
 When `max_size` is non-zero, the function keeps a head and a tail of the input and
 drops the middle, inserting a literal `...` at the cut. The split is roughly
-two-thirds of the budget to the head and one-third to the tail, computed as two
-pointers (`max_a`, `max_b`) into the input. The main loop checks the read cursor
-against that window: bytes inside the window are skipped, and at the moment the
-cursor first crosses `max_a` it emits the three dots. So the head is rendered
-normally, the dropped span produces a single `...`, and the tail is rendered
-normally. With `max_size == 0` the window is set so nothing is ever skipped.
+two-thirds of the budget to the head and one-third to the tail. The window is
+computed with arithmetic on 1-based positions `k = index + 1` (the convention of
+the original pointer loop, which pre-incremented its cursor): bytes with
+`max_size * 2 / 3 <= k <= size - max_size / 3` are dropped, and the dots are
+written where position `max_size * 2 / 3` would have been when that is at least 1.
+The head and tail are then measured and written as two ranges, so the dropped
+middle is never visited: the cost is O(max_size) plus the output, not O(size).
+With `max_size == 0` nothing is dropped. For `max_size == 1` the result is just
+the two quotes (the original sized its buffer at one byte here and wrote past it).
 
 ## Why this shape
 
 The function exists to make a byte buffer safe to print on one line, for logs and
-diagnostics, without dragging in a formatting library. A single pre-sized pass
-keeps it cheap: one allocation, one walk, one trim, no per-byte bounds checks.
+diagnostics, without dragging in a formatting library. An exact-size result and
+block-wise copying keep it cheap: one allocation, two short passes, no per-byte
+bounds checks.
 The hex rendering is delegated to `char-classify` so this library and that one
 agree on the lowercase two-digit format, and so neither reimplements a hex table.
 It is ASCII-oriented by design: high bytes are escaped rather than interpreted,
