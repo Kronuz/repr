@@ -174,7 +174,34 @@ static void test_truncation() {
 }
 
 
+// ---------------------------------------------------------------------------
+// max_size = 1 and 2: regression for a buffer overrun. With max_size == 1 the
+// elided window covers every byte and there is no "...", so the result is the
+// quotes alone (empty without quotes); with max_size == 2 it is the quotes
+// around "..." (or the bare quotes for empty input). The old code sized its buffer
+// at one byte for max_size == 1 and wrote both quotes past it.
+// ---------------------------------------------------------------------------
+
+static void test_tiny_max_size() {
+	for (std::size_t n = 0; n <= 20; ++n) {
+		std::string in;
+		for (std::size_t i = 0; i < n; ++i) { in.push_back(static_cast<char>(i % 5 == 0 ? '\n' : 'a' + i)); }
+		for (bool friendly : {true, false}) {
+			for (char quote : {'\0', '\1', '\'', '"'}) {
+				std::string q = quote == '\0' ? "" : std::string(1, quote == '\1' ? '\'' : quote);
+				std::string got1 = repr(in.data(), in.size(), friendly, quote, 1);
+				assert(got1 == q + q);
+				std::string got2 = repr(in.data(), in.size(), friendly, quote, 2);
+				assert(got2 == q + (n == 0 ? "" : "...") + q);
+			}
+		}
+	}
+	std::printf("repr tiny max_size OK: max_size 1 is just the quotes, 2 is the quotes around \"...\"\n");
+}
+
+
 int main() {
+	test_tiny_max_size();
 	test_printable_passthrough();
 	test_friendly_escapes();
 	test_hex_escapes();
