@@ -35,7 +35,7 @@
 // 1. A 256-entry table gives the output length of each byte (1 = copied as is,
 //    2 = backslash escape, 4 = \xNN), per quote mode.
 // 2. A first pass sums the lengths of the kept bytes (head and tail), so the
-//    result is allocated once at its exact size (no 4n+2 zero-fill).
+//    result is allocated once at its exact size.
 // 3. A second pass writes it. Eight bytes at a time are tested with SWAR for
 //    "all plain printable" and bulk-copied; anything else goes byte by byte
 //    through the table.
@@ -149,9 +149,9 @@ std::string repr(const void* p, size_t size, bool friendly, char quote, size_t m
 	const auto* b = static_cast<const unsigned char *>(p);
 	if (quote == '\1') { quote = '\''; }
 
-	// Elided window, in 1-based positions k = index + 1 (the historical
-	// pre-increment convention): bytes with lo <= k <= hi are skipped, and
-	// "..." is written in place of position lo when lo >= 1.
+	// Elided window, in 1-based positions k = index + 1: bytes with
+	// lo <= k <= hi are skipped, and "..." is written in place of position lo
+	// when lo >= 1.
 	std::size_t head = size;  // bytes kept from the start
 	std::size_t tail = size;  // index where the kept tail starts
 	bool dots = false;

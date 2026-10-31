@@ -66,13 +66,17 @@ int main() {
 
 `repr` sizes its result exactly (a table gives each byte's output length), then
 copies runs of plain printable bytes eight at a time and escapes the rest byte by
-byte; with `max_size` the elided middle is skipped by arithmetic, so the cost is
-O(`max_size`) however large the input is. On Apple silicon (Apple clang 17, -O3),
-against the previous implementation: printable text 2.5-6.6x faster (4 KB: 6.4 us
-to 0.96 us, faster than `absl::CEscape`'s 2.2 us), 10% non-printable 2.8-3.4x,
-all-binary 1.4x, and `max_size = 64` on a 4 KB / 64 KB input 54x / 940x. Run it
-with `cmake -B build -DREPR_BUILD_BENCH=ON && cmake --build build && ./build/repr_bench`;
-`ctest` also runs a differential test against the old implementation.
+byte. With `max_size` the elided middle is skipped by arithmetic, so the cost is
+O(`max_size`) however large the input is.
+
+On Apple silicon (Apple clang 17, -O3), a 4 KB printable buffer takes 0.96 us;
+`absl::CEscape` takes 2.2 us on the same input. Run the benchmark with:
+
+```sh
+cmake -B build -DREPR_BUILD_BENCH=ON && cmake --build build && ./build/repr_bench
+```
+
+[CHANGELOG.md](CHANGELOG.md) has the history of these numbers.
 
 ## 📚 Documentation
 
@@ -80,6 +84,7 @@ with `cmake -B build -DREPR_BUILD_BENCH=ON && cmake --build build && ./build/rep
   `max_size` parameters.
 - [ARCHITECTURE.md](ARCHITECTURE.md): the escaping and truncation rules.
 - [AGENTS.md](AGENTS.md): repository map and invariants.
+- [CHANGELOG.md](CHANGELOG.md): behavior and performance changes.
 
 ## 🛠️ Building and testing
 

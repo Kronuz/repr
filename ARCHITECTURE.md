@@ -79,14 +79,14 @@ those are the only values the escaping logic is written for.
 When `max_size` is non-zero, the function keeps a head and a tail of the input and
 drops the middle, inserting a literal `...` at the cut. The split is roughly
 two-thirds of the budget to the head and one-third to the tail. The window is
-computed with arithmetic on 1-based positions `k = index + 1` (the convention of
-the original pointer loop, which pre-incremented its cursor): bytes with
+computed with arithmetic on 1-based positions `k = index + 1`: bytes with
 `max_size * 2 / 3 <= k <= size - max_size / 3` are dropped, and the dots are
 written where position `max_size * 2 / 3` would have been when that is at least 1.
 The head and tail are then measured and written as two ranges, so the dropped
 middle is never visited: the cost is O(max_size) plus the output, not O(size).
-With `max_size == 0` nothing is dropped. For `max_size == 1` the result is just
-the two quotes (the original sized its buffer at one byte here and wrote past it).
+With `max_size == 0` nothing is dropped. With `max_size == 1` every byte is
+dropped and there are no dots, so the result is the quotes alone. With
+`max_size == 2` and a non-empty input, the result is the quotes around `...`.
 
 ## Why this shape
 

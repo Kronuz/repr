@@ -175,11 +175,10 @@ static void test_truncation() {
 
 
 // ---------------------------------------------------------------------------
-// max_size = 1 and 2: regression for a buffer overrun. With max_size == 1 the
+// max_size = 1 and 2. With max_size == 1 the
 // elided window covers every byte and there is no "...", so the result is the
 // quotes alone (empty without quotes); with max_size == 2 it is the quotes
-// around "..." (or the bare quotes for empty input). The old code sized its buffer
-// at one byte for max_size == 1 and wrote both quotes past it.
+// around "..." (or the bare quotes for empty input).
 // ---------------------------------------------------------------------------
 
 static void test_tiny_max_size() {

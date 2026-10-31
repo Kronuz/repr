@@ -1,4 +1,4 @@
-// Differential test: repr() must match the frozen pre-optimization
+// Differential test: repr() must match the frozen reference
 // implementation (repr_old, test/repr_old.cc) byte for byte on random and edge
 // inputs, across every quote mode, friendly/non-friendly and max_size values
 // around the truncation boundaries.
@@ -16,8 +16,8 @@ static int failures = 0;
 
 static void check(const std::string& in, bool friendly, char quote, size_t max_size) {
 	if (max_size == 1 && quote != '\0') {
-		// The old code sizes its buffer at one byte here and writes both quotes past it
-		// (the result ends in a stray NUL). The new code returns the two quotes.
+		// repr_old sizes its buffer at one byte here and writes both quotes past it;
+		// repr returns the two quotes.
 		char q = quote == '\1' ? '\'' : quote;
 		if (repr(in.data(), in.size(), friendly, quote, 1) != std::string(2, q) && !in.empty()) {
 			std::fprintf(stderr, "max_size=1 expected two quotes\n");

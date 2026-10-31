@@ -8,9 +8,12 @@ easy to fall into.
 ## Repo map
 
 ```
-repr.hh                      Declares repr() and the convenience overloads (void*+size, range, string, string_view, array). Header. Verbatim from Xapiand.
-repr.cc                      The one compiled function: length tables, exact-size result, 8-byte block copy. Includes "chars.hh" for chars::char_repr. Verbatim from Xapiand.
+repr.hh                      Declares repr() and the convenience overloads (void*+size, range, string, string_view, array). Header. Same as Xapiand's.
+repr.cc                      The one compiled function: length tables, exact-size result, 8-byte block copy. Includes "chars.hh" for chars::char_repr.
 test/test.cc                 Runnable smoke test: passthrough, escapes, hex, quote modes, non-friendly, NULs, overloads, truncation.
+test/diff_test.cc            Differential test of repr() against test/repr_old.cc.
+test/repr_old.cc             Frozen Xapiand implementation, the differential test's oracle. Do not edit.
+bench/bench.cc               Benchmark (REPR_BUILD_BENCH=ON): repr() against repr_old and, when available, absl::CEscape.
 examples/demo.cc             A runnable tour (not a test).
 CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest test `repr`.
 LICENSE                      MIT, Copyright (c) 2015-2019 Dubalu LLC.
@@ -18,6 +21,7 @@ README.md                    What it is, install, quick start.
 docs/API.md                  The API reference.
 docs/repr.d2                 The README diagram's source (docs/repr.svg is rendered from it).
 ARCHITECTURE.md              Internal design of the escaping pass, sizing, quoting, truncation.
+CHANGELOG.md                 Behavior and performance changes, newest first.
 ```
 
 This is not header-only. `repr.cc` must be compiled and linked; the header only
@@ -30,8 +34,8 @@ declares the overloads. The CMake target is a `STATIC` library that links
 cmake -B build && cmake --build build && ctest --test-dir build
 ```
 
-The first configure fetches `char-classify` over the network (FetchContent,
-`GIT_TAG main`). Expected output ends with `all repr tests passed`, exit 0. The
+The first configure fetches `char-classify` over the network (FetchContent, at
+the commit `CMakeLists.txt` pins). Expected output ends with `all repr tests passed`, exit 0. The
 test target is `repr_test`; the registered CTest name is `repr`. The test and demo
 are only added when this repo is the top-level project (CMakeLists.txt), so
 consumers vendoring it via `FetchContent` won't build them.
@@ -41,9 +45,8 @@ consumers vendoring it via `FetchContent` won't build them.
 `repr.cc` includes `"chars.hh"` for one symbol, `chars::char_repr` (writes the
 lowercase two-digit hex of a byte through a `char**`). That header lives in the
 sibling [char-classify](https://github.com/Kronuz/char-classify) library, pulled
-in by CMake and linked `PUBLIC` so the include path resolves. We track its tip
-with `GIT_TAG main`, like the rest of the family. This is the library's only
-dependency; there was no `log.h` / opts / config coupling in the original.
+in by CMake and linked `PUBLIC` so the include path resolves. This is the
+library's only dependency; there is no logging or config coupling.
 
 ## Conventions
 
@@ -75,19 +78,20 @@ dependency; there was no `log.h` / opts / config coupling in the original.
 - **Hex rendering is delegated to `chars::char_repr`.** Two lowercase hex digits,
   written through the cursor, advancing it by two. Don't inline a second hex table
   here; keep it coming from char-classify so the two libraries agree.
-- **Behavior is pinned by `test/diff_test.cc`.** It compares `repr()` with a frozen
-  copy of the previous implementation (`test/repr_old.cc`) over random and edge
-  inputs, every quote mode and `max_size` values around the truncation window.
-  The one deliberate difference is `max_size == 1` with a quote (see ARCHITECTURE).
+- **Behavior is pinned by `test/diff_test.cc`.** It compares `repr()` with the
+  frozen Xapiand implementation (`test/repr_old.cc`) over random and edge inputs,
+  every quote mode and `max_size` values around the truncation window. The one
+  deliberate difference is `max_size == 1` with a quote: `repr_old` writes past
+  its buffer there, so the test checks `repr()` for the two quotes instead.
 
 ## How to extend
 
-- **Add a named escape (e.g. `\a`, `\v`).** There are commented-out cases in the
-  `friendly` switch for exactly this. Uncommenting one is safe because `\a` is two
-  output bytes, well under the four-byte `\xNN` worst case the buffer is sized for.
-  An escape *longer* than four bytes needs a wider length table entry.
-- **Always extend the smoke test.** `test/test.cc` is the only executable check.
-  Add a case for any new escape or mode and assert the exact string.
+- **Add a named escape (e.g. `\a`, `\v`).** Give it length 2 and its letter in
+  `make_tab`; `emit_byte` writes every length-2 entry as a backslash plus that
+  letter, and `dirty8` already flags every byte below 0x20. An escape longer than
+  four bytes needs a new case in `emit_byte` as well.
+- **Always extend the smoke test.** `test/test.cc` asserts exact strings;
+  `test/diff_test.cc` only compares against the oracle. Add a case for any new escape or mode and assert the exact string.
 
 ## Traps
 
@@ -104,8 +108,9 @@ dependency; there was no `log.h` / opts / config coupling in the original.
 ## Standalone vs. Xapiand
 
 This is a standalone extraction from
-[Xapiand](https://github.com/Kronuz/Xapiand). `repr.hh` and `repr.cc` were copied
-verbatim, and `repr.cc` has since been rewritten for speed (the old version lives on as `test/repr_old.cc`, the test oracle); the only change on extraction was resolving the one local include,
-`"chars.hh"`, against the standalone char-classify library through CMake instead
-of Xapiand's source tree. There is no source decoupling delta. Keep the header and the
-behavior reconcilable with upstream.
+[Xapiand](https://github.com/Kronuz/Xapiand). `repr.hh` matches upstream.
+`repr.cc` is a faster implementation with the same output, apart from the
+`max_size == 1` case above; the Xapiand version is `test/repr_old.cc`, the test
+oracle. The one local include, `"chars.hh"`, resolves against the standalone
+char-classify library through CMake. Keep the header and the behavior
+reconcilable with upstream.

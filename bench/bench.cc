@@ -1,4 +1,4 @@
-// repr/escape benchmark: new repr() against the frozen old implementation
+// repr/escape benchmark: repr() against the frozen reference implementation
 // (test/repr_old.cc) and, when abseil is available, absl::CEscape (whose output
 // differs, so it is a speed reference only). Build with -DREPR_BUILD_BENCH=ON.
 // Reports the best of several samples in ns per call.
