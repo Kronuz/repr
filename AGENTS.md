@@ -9,13 +9,13 @@ easy to fall into.
 
 ```
 repr.hh                      Declares repr() and the convenience overloads (void*+size, range, string, string_view, array). Header. Same as Xapiand's.
-repr.cc                      The one compiled function: length tables, exact-size result, 8-byte block copy. Includes "chars.hh" for chars::char_repr.
+repr.cc                      The one compiled function: the truncation window, quotes, exact-size result, the non-friendly hex path. The escaping kernel is char-classify's chars_escape.hh.
 test/test.cc                 Runnable smoke test: passthrough, escapes, hex, quote modes, non-friendly, NULs, overloads, truncation.
 test/diff_test.cc            Differential test of repr() against test/repr_old.cc.
 test/repr_old.cc             Frozen Xapiand implementation, the differential test's oracle. Do not edit.
 bench/bench.cc               Benchmark (REPR_BUILD_BENCH=ON): repr() against repr_old and, when available, absl::CEscape.
 examples/demo.cc             A runnable tour (not a test).
-CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest test `repr`.
+CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest tests `repr`, `repr_diff` and their portable-backend twins `repr_swar`, `repr_diff_swar`.
 LICENSE                      MIT, Copyright (c) 2015-2019 Dubalu LLC.
 README.md                    What it is, install, quick start.
 docs/API.md                  The API reference.
@@ -26,7 +26,7 @@ CHANGELOG.md                 Behavior and performance changes, newest first.
 
 This is not header-only. `repr.cc` must be compiled and linked; the header only
 declares the overloads. The CMake target is a `STATIC` library that links
-`char-classify` so `"chars.hh"` resolves.
+`char-classify` so its headers resolve.
 
 ## Build and run the test
 
@@ -42,8 +42,11 @@ consumers vendoring it via `FetchContent` won't build them.
 
 ## Dependency
 
-`repr.cc` includes `"chars.hh"` for one symbol, `chars::char_repr` (writes the
-lowercase two-digit hex of a byte through a `char**`). That header lives in the
+`repr.cc` includes `"chars_escape.hh"`, the escaping kernel (the length table, the
+measuring pass and the writer, shared with `escape`, built on `chars_simd.hh`), and
+`"chars.hh"` for `chars::char_repr` (writes the lowercase two-digit hex of a byte
+through a `char**`, used by the non-friendly path and the kernel's byte writer). Those
+headers live in the
 sibling [char-classify](https://github.com/Kronuz/char-classify) library, pulled
 in by CMake and linked `PUBLIC` so the include path resolves. This is the
 library's only dependency; there is no logging or config coupling.
@@ -62,12 +65,13 @@ library's only dependency; there is no logging or config coupling.
 ## Load-bearing invariants
 
 - **The output buffer is sized exactly, from the same table that writes it.**
-  `repr.cc` measures the kept bytes with the length table, calls `ret.resize(n)`
-  once and writes through a raw `char*` with no bounds checks (an `assert` checks
-  that the writer produced exactly `n` bytes). If you add or change an escape you
-  must change the table (`make_tab`) and the writer (`emit_byte`) together, and
-  the SWAR test (`dirty8`) if the set of "plain" bytes changes. Writing more than
-  the table says is a heap overflow.
+  `repr.cc` measures the kept bytes with `chars::escape_measure`, calls
+  `ret.resize(n)` once and writes with `chars::escape_emit`, which stores through a raw
+  `char*` with no bounds checks inside the measured room (an `assert` checks
+  that the writer produced exactly `n` bytes). The rules live in char-classify's
+  `chars_escape.hh`: if you add or change an escape, change its table, writer and
+  vector test together (its AGENTS.md says how), then bump this repo's pin. Writing
+  more than the table says is a heap overflow.
 - **`repr` is size-based, not NUL-terminated.** It renders exactly `size` bytes,
   including any embedded `\0` (as `\x00`). Don't "optimize" it to stop at a NUL.
   The array overload deliberately passes `N - 1` to drop only a *string literal's*
@@ -86,10 +90,12 @@ library's only dependency; there is no logging or config coupling.
 
 ## How to extend
 
-- **Add a named escape (e.g. `\a`, `\v`).** Give it length 2 and its letter in
-  `make_tab`; `emit_byte` writes every length-2 entry as a backslash plus that
-  letter, and `dirty8` already flags every byte below 0x20. An escape longer than
-  four bytes needs a new case in `emit_byte` as well.
+- **Add a named escape (e.g. `\a`, `\v`).** It is a change to the kernel in
+  char-classify: give the byte length 2 and its letter in `make_escape_table`; the
+  writers emit every length-2 entry as a backslash plus that letter, and the block
+  tests already flag every byte below 0x20. The two-byte count in `escape_measure`
+  lists the named escapes, so it changes with them. An escape longer than four bytes
+  needs a new case in the writers as well. Then bump this repo's pin.
 - **Always extend the smoke test.** `test/test.cc` asserts exact strings;
   `test/diff_test.cc` only compares against the oracle. Add a case for any new escape or mode and assert the exact string.
 

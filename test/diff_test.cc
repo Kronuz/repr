@@ -72,13 +72,28 @@ int main() {
 			for (char q : quotes) { for (bool f : {true, false}) { check(s, f, q, m); } }
 		}
 	}
-	// Every single byte value in every position of an 8..17 byte window.
+	// Every single byte value in every position of 1..70 byte windows: the 8-byte block edges,
+	// the 16-byte vector loop (it runs while 32 bytes remain) and the tails behind it.
 	for (int c = 0; c < 256; ++c) {
-		for (size_t n = 1; n <= 17; ++n) {
+		for (size_t n = 1; n <= 70; ++n) {
 			for (size_t pos = 0; pos < n; ++pos) {
 				std::string s(n, 'k');
 				s[pos] = static_cast<char>(c);
 				for (char q : quotes) { check(s, true, q, 0); check(s, false, q, 0); }
+			}
+		}
+	}
+	// The same windows with the head and tail of a truncated result: the elided middle splits
+	// the input into two ranges, each with its own blocks and tails.
+	{
+		const char sp[] = {'\n', '\\', '\'', '"', 0x1f, 0x7f, char(0xff), '\0', 'a', '~'};
+		for (char c : sp) {
+			for (size_t n = 1; n <= 90; ++n) {
+				for (size_t pos = 0; pos < n; ++pos) {
+					std::string s(n, 'k');
+					s[pos] = c;
+					for (char q : quotes) { for (size_t m : {3, 17, 30, 64}) { check(s, true, q, m); } }
+				}
 			}
 		}
 	}

@@ -11,8 +11,13 @@ A header of overloads and a single compiled function:
 
 ```
   repr.hh   declares repr() and its convenience overloads (range, string, array)
-  repr.cc   the one real function: a pre-sized, single-pass escaping loop
+  repr.cc   the one real function: the truncation window, quotes, the exact size
 ```
+
+The escaping itself (the length table, the measuring pass and the writer) is
+char-classify's `chars_escape.hh` (`chars::escape_measure`, `chars::escape_emit`),
+shared with `escape()`: `escape(p, n, q)` is `repr(p, n, true, q, 0)`, and both call the
+same kernel so they cannot disagree.
 
 All the overloads in `repr.hh` are thin wrappers that normalize their argument to
 `(const void* p, std::size_t size)` and call the core function in `repr.cc`. The
@@ -30,11 +35,13 @@ The output is allocated once at its exact size and then written through a raw
    the active quote) or 4 (`\xNN`).
 2. **Measure.** The first pass sums the table lengths over the kept bytes, so
    `ret.resize(n)` is exact (plus the two quotes and the `...`, when present).
-3. **Write.** The second pass handles eight bytes at a time: one 64-bit load is
-   tested (SWAR) for "no byte below 0x20 or at/above 0x7f, no backslash, no
-   quote". A clean block is copied with one 8-byte store; any other block goes
-   byte by byte through the table. Escape-heavy input therefore pays one extra
-   test per eight bytes, and printable text copies at memory speed.
+3. **Write.** The second pass tests a block of bytes at a time for "no byte below
+   0x20 or at/above 0x7f, no backslash, no quote": 16 bytes with NEON or SSE2, 8 with a
+   64-bit SWAR test where there is neither. A clean block is copied with one store; the
+   escapes of any other block are found from its mask, the bytes between them are copied
+   with block stores, and each escape is written from its table entry. Printable text
+   copies at memory speed. [char-classify's ARCHITECTURE.md](https://github.com/Kronuz/char-classify/blob/main/ARCHITECTURE.md)
+   describes the kernel.
 
 `friendly == false` skips the tables: every kept byte is `\xNN`, so the size is
 `4 * kept bytes` and the pass is a straight hex write.

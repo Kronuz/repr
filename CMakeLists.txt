@@ -4,25 +4,27 @@ project(repr LANGUAGES CXX)
 include(FetchContent)
 
 # --- Dependency: char-classify ---
-# repr.cc includes "chars.hh" for chars::char_repr (the byte-to-hex writer). That
-# header lives in the sibling char-classify library, pulled in here so the include
-# resolves. It is pinned to a commit with GIT_TAG, like the rest of the family.
+# repr.cc includes "chars_escape.hh", char-classify's escaping kernel (the length table, the
+# measuring pass and the writer shared with escape), and "chars.hh" for chars::char_repr (the
+# byte-to-hex writer). The headers live in the sibling char-classify library, pulled in here so
+# the includes resolve. It is pinned to a commit with GIT_TAG, like the rest of the family.
 FetchContent_Declare(
   char_classify
   GIT_REPOSITORY https://github.com/Kronuz/char-classify.git
-  GIT_TAG        a8904965dc904690ddd6875ab7acbfd271d97832
+  GIT_TAG        d670574e2cba26cb7f693fa29ddc5aa08aea85eb
 )
 FetchContent_MakeAvailable(char_classify)
 
 # --- Library target ---
-# repr is not header-only: repr.cc carries the escaping loop, so it must be
-# compiled and linked. The header alone (repr.hh) only declares the overloads.
+# repr is not header-only: repr.cc holds the entry point (the truncation window, quotes and the
+# exact sizing), so it must be compiled and linked. The header alone (repr.hh) only declares
+# the overloads.
 add_library(repr repr.cc)
 target_include_directories(repr PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(repr PUBLIC cxx_std_20)
 
-# Link char-classify so "chars.hh" is on the include path. PUBLIC because repr.cc
-# uses it; consumers don't need chars.hh themselves, but linking it PUBLIC keeps
+# Link char-classify so its headers are on the include path. PUBLIC because repr.cc
+# uses them; consumers don't need them themselves, but linking it PUBLIC keeps
 # the include path consistent and harmless.
 target_link_libraries(repr PUBLIC char_classify::char_classify)
 
@@ -42,6 +44,22 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   add_executable(repr_diff_test test/diff_test.cc test/repr_old.cc)
   target_link_libraries(repr_diff_test PRIVATE repr)
   add_test(NAME repr_diff COMMAND repr_diff_test)
+
+  # The same two tests with the portable block backend forced (CHARS_NO_SIMD); the default
+  # one is NEON or SSE2, so this is the only run of the 8-byte SWAR path there.
+  add_library(repr_swar STATIC repr.cc)
+  target_include_directories(repr_swar PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_compile_features(repr_swar PUBLIC cxx_std_20)
+  target_link_libraries(repr_swar PUBLIC char_classify::char_classify)
+  target_compile_definitions(repr_swar PRIVATE CHARS_NO_SIMD=1)
+
+  add_executable(repr_test_swar test/test.cc)
+  target_link_libraries(repr_test_swar PRIVATE repr_swar)
+  add_test(NAME repr_swar COMMAND repr_test_swar)
+
+  add_executable(repr_diff_test_swar test/diff_test.cc test/repr_old.cc)
+  target_link_libraries(repr_diff_test_swar PRIVATE repr_swar)
+  add_test(NAME repr_diff_swar COMMAND repr_diff_test_swar)
 
   # Benchmark (not run by ctest): old vs new, plus absl::CEscape when abseil is
   # installed. The comparator is optional and never a dependency of the library.

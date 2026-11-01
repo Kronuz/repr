@@ -65,12 +65,13 @@ int main() {
 ## ⚡ Performance
 
 `repr` sizes its result exactly (a table gives each byte's output length), then
-copies runs of plain printable bytes eight at a time and escapes the rest byte by
-byte. With `max_size` the elided middle is skipped by arithmetic, so the cost is
-O(`max_size`) however large the input is.
-
-On Apple silicon (Apple clang 17, -O3), a 4 KB printable buffer takes 0.96 us;
-`absl::CEscape` takes 2.2 us on the same input. Run the benchmark with:
+tests the input a block at a time (16 bytes with NEON or SSE2, 8 with a portable
+fallback): a clean block is copied whole and the escapes of any other block are
+written from the table. The kernel is [char-classify](https://github.com/Kronuz/char-classify)'s
+`chars_escape.hh`, shared with `escape`. With `max_size` the elided middle is
+skipped by arithmetic, so the cost is O(`max_size`) however large the input is.
+`absl::CEscape` writes a different format, so the benchmark uses it as a speed
+reference only. Run the benchmark with:
 
 ```sh
 cmake -B build -DREPR_BUILD_BENCH=ON && cmake --build build && ./build/repr_bench

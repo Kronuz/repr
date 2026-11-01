@@ -45,16 +45,27 @@ static std::string make(size_t n, int dirty_pct) {
 	return s;
 }
 
+// Printable text where `pct` percent of the bytes are control characters (every one needs an escape).
+static std::string make_ctl(size_t n, int pct) {
+	std::mt19937 rng(2);
+	std::string s(n, 'a');
+	for (auto& c : s) { c = (static_cast<int>(rng() % 100) < pct) ? static_cast<char>(rng() % 32) : static_cast<char>(0x20 + rng() % 95); }
+	return s;
+}
+
 int main() {
 	std::printf("%-28s %12s %12s %8s %12s\n", "workload", "old ns", "new ns", "x", "absl ns");
-	struct W { const char* name; size_t n; int dirty; size_t max; };
+	struct W { const char* name; size_t n; int dirty; size_t max; int ctl; };
 	const W ws[] = {
-		{"printable 16 B", 16, 0, 0}, {"printable 256 B", 256, 0, 0}, {"printable 4 KB", 4096, 0, 0},
-		{"printable 64 KB", 65536, 0, 0}, {"mixed 10% 256 B", 256, 10, 0}, {"mixed 10% 64 KB", 65536, 10, 0},
-		{"binary 4 KB", 4096, 100, 0}, {"max_size=64 on 4 KB", 4096, 0, 64}, {"max_size=64 on 64 KB", 65536, 0, 64},
+		{"printable 1 B", 1, 0, 0, 0}, {"printable 8 B", 8, 0, 0, 0},
+		{"printable 16 B", 16, 0, 0, 0}, {"printable 256 B", 256, 0, 0, 0}, {"printable 4 KB", 4096, 0, 0, 0},
+		{"printable 64 KB", 65536, 0, 0, 0}, {"mixed 10% 256 B", 256, 10, 0, 0}, {"mixed 10% 64 KB", 65536, 10, 0, 0},
+		{"ctl 1% 4 KB", 4096, 0, 0, 1}, {"ctl 10% 256 B", 256, 0, 0, 10}, {"ctl 10% 4 KB", 4096, 0, 0, 10},
+		{"ctl 10% 64 KB", 65536, 0, 0, 10}, {"ctl 50% 4 KB", 4096, 0, 0, 50},
+		{"binary 4 KB", 4096, 100, 0, 0}, {"max_size=64 on 4 KB", 4096, 0, 64, 0}, {"max_size=64 on 64 KB", 65536, 0, 64, 0},
 	};
 	for (const auto& w : ws) {
-		std::string s = make(w.n, w.dirty);
+		std::string s = w.ctl ? make_ctl(w.n, w.ctl) : make(w.n, w.dirty);
 		double o = best_ns([&] { sink = repr_old(s.data(), s.size(), true, '\'', w.max).size(); });
 		double n = best_ns([&] { sink = repr(s.data(), s.size(), true, '\'', w.max).size(); });
 		double a = 0;
