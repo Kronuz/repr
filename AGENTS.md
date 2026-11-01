@@ -72,6 +72,14 @@ library's only dependency; there is no logging or config coupling.
   `chars_escape.hh`: if you add or change an escape, change its table, writer and
   vector test together (its AGENTS.md says how), then bump this repo's pin. Writing
   more than the table says is a heap overflow.
+- **The entry point stays thin.** `repr()` writes the result itself only for fewer than
+  `chars::escape_scalar_max` bytes with nothing elided (the window keeps every byte), a byte at a
+  time, and otherwise tail-calls `repr_hex` (`friendly == false`) or `repr_blocks`, which work out
+  the window themselves. Keep the table scratch and the block loops in `repr_blocks`
+  (`CHARS_NOINLINE`): in the entry point they add a frame that costs more than escaping one to
+  four bytes, and do not pass the window to them by reference (a stack object makes the call a
+  non-tail call with a frame). The short path must not be taken when anything is elided;
+  `test_tiny_max_size` and the window cases of `test/diff_test.cc` fail if it is.
 - **`repr` is size-based, not NUL-terminated.** It renders exactly `size` bytes,
   including any embedded `\0` (as `\x00`). Don't "optimize" it to stop at a NUL.
   The array overload deliberately passes `N - 1` to drop only a *string literal's*

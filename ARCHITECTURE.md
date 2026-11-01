@@ -46,6 +46,16 @@ The output is allocated once at its exact size and then written through a raw
 `friendly == false` skips the tables: every kept byte is `\xNN`, so the size is
 `4 * kept bytes` and the pass is a straight hex write.
 
+**Entry point.** `repr()` takes one of three paths, each its own function so that a call pays
+only for the frame it needs. For fewer than `chars::escape_scalar_max` (8) bytes with nothing
+elided, it writes the result itself, a byte at a time: for `friendly == true`
+(`escape_measure_scalar`, `escape_emit_scalar`) one pass over the worst case (four bytes for each,
+plus the quotes) and a trim when that fits a small string, and otherwise the two passes, measuring
+first; for `friendly == false` a loop of `\xNN`. Everything else goes to `repr_hex`
+(`friendly == false`) or `repr_blocks` (`friendly == true`), each out of line and each working
+out the elided window itself, so the entry point is a size test and a tail call. The table
+scratch for a custom quote and the registers the block loops use live only in `repr_blocks`.
+
 ## What each byte becomes
 
 For each byte, with `friendly` true:

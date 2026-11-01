@@ -7,24 +7,50 @@ Notable changes to `repr`, newest first. The format follows
 
 ### Added
 
-- `bench/bench.cc` has rows for 1, 4, 8 and 16 printable bytes without a quote and for `friendly=false`
-  at 16 B and 4 KB (the audit found regressions on inputs the earlier rows did not cover). The frozen
-  original and `repr` are sampled in turn instead of one after the other, so a drift of the host hits both.
+- `bench/bench.cc` has rows for 1, 4, 7, 8, 15 and 16 printable bytes (with and without a quote), `max_size=64`
+  on 4 B, and `friendly=false` at 1 B, 16 B and 4 KB (the audit found regressions on inputs the earlier rows did
+  not cover). The frozen original and `repr` are sampled in turn instead of one after the other, so a drift of
+  the host hits both, and a column A/A gives how far apart two sets of samples of `repr` are: the noise of the
+  row.
+
+### Changed
+
+- **Input of fewer than 8 bytes with nothing elided is written by the entry point itself, a byte at a time.**
+  The entry point used to save the registers of the block loops, reserve the stack for the table of a custom
+  quote and set up the window before it looked at the size, which cost 5% to 16% on 1 to 4 bytes. Now `repr()`
+  tests the size first: for `friendly=true` it takes the byte loops of char-classify's `chars_escape.hh`
+  (`escape_measure_scalar`, `escape_emit_scalar`, with the shared tables of `escape_table_shared`) in one pass
+  when the worst case, four bytes for each, fits a small string, and in two otherwise; for `friendly=false` it
+  writes `\xNN` in a loop. Everything else goes to `repr_hex` or `repr_blocks`, out of line, each working out
+  the elided window itself, so the entry point is a size test and a tail call for them. Output is identical:
+  `test_tiny_max_size` and `test/diff_test.cc` cover the sizes around the step, the elided windows (the short
+  path must not be taken when anything is elided) and every quote mode. Reverting the elision test, the room
+  for the quotes, the dots of `repr_hex`, the closing quote of any of the three short paths, the trim of the
+  one-pass path or its worst case each fails a test. char-classify is pinned at the commit that has the scalar
+  functions.
 
 ### Measured
 
-Against the frozen original (`test/repr_old.cc`), three runs of `repr_bench` each, `-O3`, Apple clang 17:
+Against the frozen original (`test/repr_old.cc`), three runs of `repr_bench` each, `-O3`, Apple clang 17; A/A is
+under 8% on every row but one (15% on the M4 Pro at 4 B without a quote):
 
 | workload | M4 Pro | i9-9980HK |
 |---|---:|---:|
-| printable 1 B | 7.4-7.9 to 8.3-8.6 ns | 18.0-18.8 to 21.1-21.6 ns |
-| printable 4 B, no quote | 9.4-11.1 to 9.8-10.2 ns | 22.9-23.5 to 24.4-25.2 ns |
-| printable 8 B | 3.0x faster | 2.9x faster |
-| printable 16 B | 2.8x-3.2x faster | 3.0x faster |
-| `friendly=false` 16 B | 0.92x-0.99x | 1.18x-1.21x |
-| `friendly=false` 4 KB | 1.00x | 3.0x-3.1x |
+| printable 1 B | 7.7-7.9 to 6.5-6.7 ns | 17.8-17.9 to 16.7-17.0 ns |
+| printable 1 B, no quote | 7.7-8.3 to 6.3-7.2 ns | 18.1-18.4 to 16.9-17.3 ns |
+| printable 4 B | 9.7-12.2 to 7.1-7.4 ns | 24.5 to 19.1-20.2 ns |
+| printable 4 B, no quote | 9.4-12.0 to 7.2-8.3 ns | 24.2-24.5 to 19.2-19.8 ns |
+| printable 7 B and 8 B | 2.9x-3.6x faster | 2.7x faster |
+| printable 15 B and 16 B | 2.8x-3.2x faster | 2.5x-3.0x faster |
+| `max_size=64` on 4 B | 3.0x-3.5x faster | 3.2x faster |
+| `friendly=false` 1 B | 1.18x-1.22x | 1.00x-1.03x |
+| `friendly=false` 16 B | 0.99x-1.08x | 1.08x-1.10x |
+| `friendly=false` 4 KB | 1.01x-1.03x | 1.6x faster |
 
-The 2026-10-31 table compares with the previous 8-byte kernel, which is not in the repository.
+No row is below 0.97x. The rows from 256 B up are within the noise of the run before the change (printable 4 KB
+on the M4 Pro: 9.6x to 10.0x faster than the original then, 9.8x to 10.3x now; `ctl` 10% 4 KB: 7.5x to 7.8x
+then, 7.5x to 7.7x now). The 2026-10-31 table compares with the previous 8-byte kernel, which is not in the
+repository.
 
 ## 2026-10-31
 

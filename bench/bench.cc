@@ -39,14 +39,18 @@ static double best_ns(F&& f) {
 	return best;
 }
 
-// The best of seven samples of each, taken alternately.
+// The best of seven samples of each, taken alternately, and of a second set of samples of
+// `g`: `aa` is how far apart the two sets of `g` are, in percent (the noise of the row).
 template <typename F, typename G>
-static void best_pair(F&& f, G&& g, double& best_f, double& best_g) {
+static void best_pair(F&& f, G&& g, double& best_f, double& best_g, double& aa) {
 	best_f = best_g = 1e18;
+	double best_g2 = 1e18;
 	for (int s = 0; s < 7; ++s) {
 		best_f = std::min(best_f, sample_ns(f));
 		best_g = std::min(best_g, sample_ns(g));
+		best_g2 = std::min(best_g2, sample_ns(g));
 	}
+	aa = 100.0 * (best_g2 > best_g ? best_g2 - best_g : best_g - best_g2) / best_g;
 }
 
 static volatile size_t sink;
@@ -70,26 +74,28 @@ static std::string make_ctl(size_t n, int pct) {
 }
 
 int main() {
-	std::printf("%-28s %12s %12s %8s %12s\n", "workload", "old ns", "new ns", "x", "absl ns");
+	std::printf("%-28s %12s %12s %8s %12s %7s\n", "workload", "old ns", "new ns", "x", "absl ns", "A/A %");
 	struct W { const char* name; size_t n; int dirty; size_t max; int ctl; };
 	const W ws[] = {
-		{"printable 1 B", 1, 0, 0, 0}, {"printable 8 B", 8, 0, 0, 0},
+		{"printable 1 B", 1, 0, 0, 0}, {"printable 4 B", 4, 0, 0, 0}, {"printable 7 B", 7, 0, 0, 0}, {"printable 8 B", 8, 0, 0, 0},
+		{"printable 15 B", 15, 0, 0, 0},
 		{"printable 16 B", 16, 0, 0, 0}, {"printable 256 B", 256, 0, 0, 0}, {"printable 4 KB", 4096, 0, 0, 0},
 		{"printable 64 KB", 65536, 0, 0, 0}, {"mixed 10% 256 B", 256, 10, 0, 0}, {"mixed 10% 64 KB", 65536, 10, 0, 0},
 		{"ctl 1% 4 KB", 4096, 0, 0, 1}, {"ctl 10% 256 B", 256, 0, 0, 10}, {"ctl 10% 4 KB", 4096, 0, 0, 10},
 		{"ctl 10% 64 KB", 65536, 0, 0, 10}, {"ctl 50% 4 KB", 4096, 0, 0, 50},
-		{"binary 4 KB", 4096, 100, 0, 0}, {"max_size=64 on 4 KB", 4096, 0, 64, 0}, {"max_size=64 on 64 KB", 65536, 0, 64, 0},
+		{"binary 4 KB", 4096, 100, 0, 0}, {"max_size=64 on 4 B", 4, 0, 64, 0}, {"max_size=64 on 4 KB", 4096, 0, 64, 0},
+		{"max_size=64 on 64 KB", 65536, 0, 64, 0},
 	};
 	for (const auto& w : ws) {
 		std::string s = w.ctl ? make_ctl(w.n, w.ctl) : make(w.n, w.dirty);
-		double o = 0, n = 0;
+		double o = 0, n = 0, aa = 0;
 		best_pair([&] { sink = repr_old(s.data(), s.size(), true, '\'', w.max).size(); },
-			[&] { sink = repr(s.data(), s.size(), true, '\'', w.max).size(); }, o, n);
+			[&] { sink = repr(s.data(), s.size(), true, '\'', w.max).size(); }, o, n, aa);
 		double a = 0;
 #ifdef HAVE_ABSL
 		if (w.max == 0) { a = best_ns([&] { sink = absl::CEscape(s).size(); }); }
 #endif
-		std::printf("%-28s %12.1f %12.1f %8.2f %12.1f\n", w.name, o, n, o / n, a);
+		std::printf("%-28s %12.1f %12.1f %8.2f %12.1f %7.1f\n", w.name, o, n, o / n, a, aa);
 	}
 
 	// The rows above leave the options at their defaults and start at one byte of printable text.
@@ -102,16 +108,16 @@ int main() {
 		for (size_t i = 0; i < n; ++i) { s[i] = static_cast<char>('a' + i % 26); }
 		edges.push_back({"printable " + std::to_string(n) + " B, no quote", s, true, '\0'});
 	}
-	for (size_t n : {16, 4096}) {
+	for (size_t n : {1, 16, 4096}) {
 		std::string s(n, '\0');
 		for (size_t i = 0; i < n; ++i) { s[i] = static_cast<char>(i * 37); }
 		edges.push_back({"friendly=false " + std::to_string(n) + " B", s, false, '\''});
 	}
 	for (const auto& e : edges) {
-		double o = 0, n = 0;
+		double o = 0, n = 0, aa = 0;
 		best_pair([&] { sink = repr_old(e.s.data(), e.s.size(), e.friendly, e.quote, 0).size(); },
-			[&] { sink = repr(e.s.data(), e.s.size(), e.friendly, e.quote, 0).size(); }, o, n);
-		std::printf("%-28s %12.1f %12.1f %8.2f %12.1f\n", e.name.c_str(), o, n, o / n, 0.0);
+			[&] { sink = repr(e.s.data(), e.s.size(), e.friendly, e.quote, 0).size(); }, o, n, aa);
+		std::printf("%-28s %12.1f %12.1f %8.2f %12.1f %7.1f\n", e.name.c_str(), o, n, o / n, 0.0, aa);
 	}
 	return 0;
 }
