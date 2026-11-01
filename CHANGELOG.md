@@ -15,6 +15,10 @@ Notable changes to `repr`, newest first. The format follows
 
 ### Changed
 
+- `bench/bench.cc` times a hand-written loop (one append per byte to a reserved `std::string`) beside
+  `repr`, the frozen original and `absl::CEscape`, and fails when the loop's output differs from
+  `repr`'s. Abseil is fetched at 20260817.0 by the benchmark target instead of being looked up on the
+  machine.
 - **Input of fewer than 8 bytes with nothing elided is written by the entry point itself, a byte at a time.**
   The entry point used to save the registers of the block loops, reserve the stack for the table of a custom
   quote and set up the window before it looked at the size, which cost 5% to 16% on 1 to 4 bytes. Now `repr()`

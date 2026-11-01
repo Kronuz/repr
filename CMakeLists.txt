@@ -61,17 +61,20 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   target_link_libraries(repr_diff_test_swar PRIVATE repr_swar)
   add_test(NAME repr_diff_swar COMMAND repr_diff_test_swar)
 
-  # Benchmark (not run by ctest): old vs new, plus absl::CEscape when abseil is
-  # installed. The comparator is optional and never a dependency of the library.
-  option(REPR_BUILD_BENCH "Build bench/bench.cc" OFF)
+  # Benchmark (not run by ctest): repr against a hand-written loop, the frozen original and
+  # absl::CEscape. Abseil is fetched at a pinned release for this target only and is never a
+  # dependency of the library.
+  option(REPR_BUILD_BENCH "Build bench/bench.cc (fetches abseil)" OFF)
   if(REPR_BUILD_BENCH)
+    set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
+    set(ABSL_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(abseil
+      GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+      GIT_TAG        20260817.0)
+    FetchContent_MakeAvailable(abseil)
     add_executable(repr_bench bench/bench.cc test/repr_old.cc)
-    target_link_libraries(repr_bench PRIVATE repr)
-    find_package(absl QUIET)
-    if(absl_FOUND)
-      target_compile_definitions(repr_bench PRIVATE HAVE_ABSL=1)
-      target_link_libraries(repr_bench PRIVATE absl::strings)
-    endif()
+    target_link_libraries(repr_bench PRIVATE repr absl::strings)
+    target_compile_definitions(repr_bench PRIVATE HAVE_ABSL=1)
   endif()
 
   # A runnable tour of the library (not a test): build & run ./build/repr_demo
