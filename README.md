@@ -92,24 +92,26 @@ Not for:
 ## ⚡ Performance
 
 [`repr_bench`](bench/bench.cc) times one call, `repr(bytes)` with the default quote and
-`friendly=true`, in ns, as the best of seven samples of at least 8 ms. The rows name the input:
-`printable` is that many bytes of printable ASCII, `10% random bytes` is printable text where
-one byte in ten is a random byte, `10% control bytes` is printable text where one in ten is a
-control character (each needs an escape), and `bytes from 0x80 up` is every byte escaped as
-`\xNN`. The comparator is [abseil](https://github.com/abseil/abseil-cpp) 20260817.0's
-`absl::CEscape`, fetched by the benchmark target only. It writes a different format (octal
-escapes, no quotes), so the two do not return the same results and it is a speed reference
-only. "× faster" is `CEscape`'s time over `repr`'s, so a value below 1 is a loss.
+`friendly=true`, in ns, as the best of seven samples of at least 8 ms, the better of two runs.
+The rows name the input: `printable` is that many bytes of printable ASCII, `10% random bytes` is
+printable text where one byte in ten is a random byte, `10% control bytes` is printable text where
+one in ten is a control character (each needs an escape), and `bytes from 0x80 up` is every byte
+escaped as `\xNN`. Two comparators sit beside `repr`. The loop is what most code would write,
+`naive_repr` in the same file: a `std::string` with `reserve`, one `push_back` per byte and the same
+escapes; the benchmark checks that its output equals `repr`'s on every input. `CEscape` is
+[abseil](https://github.com/abseil/abseil-cpp) 20260817.0's `absl::CEscape`, fetched by the
+benchmark target only; it writes a different format (octal escapes, no quotes), so it does not
+return the same results and is a speed reference only.
 
-| Input | M4 Pro `repr` | M4 Pro `CEscape` | M4 Pro × faster | i9 `repr` | i9 `CEscape` | i9 × faster |
+| Input | M4 Pro `repr` | M4 Pro loop | M4 Pro `CEscape` | i9 `repr` | i9 loop | i9 `CEscape` |
 |---|---:|---:|---:|---:|---:|---:|
-| printable 16 B | 10 | 10 | 1.0 | 26 | 16 | 0.62 |
-| printable 256 B | 50 | 181 | 3.6 | 165 | 373 | 2.3 |
-| printable 4 KB | 450 | 2,200 | 4.9 | 933 | 4,000 | 4.3 |
-| printable 64 KB | 7,500 | 35,200 | 4.7 | 25,100 | 63,700 | 2.5 |
-| 10% random bytes, 64 KB | 12,800 | 35,600 | 2.8 | 46,500 | 61,900 | 1.3 |
-| 10% control bytes, 4 KB | 832 | 2,200 | 2.6 | 1,700 | 4,100 | 2.4 |
-| bytes from `0x80` up, 4 KB | 1,700 | 2,200 | 1.3 | 3,200 | 4,000 | 1.25 |
+| printable 16 B | 12.1 | 41.5 | 7.4 | 31.2 | 88.5 | 17.1 |
+| printable 256 B | 53.7 | 778 | 146 | 181 | 1,469 | 380 |
+| printable 4 KB | 450 | 12,183 | 1,986 | 980 | 21,086 | 3,346 |
+| printable 64 KB | 7,633 | 191,965 | 31,583 | 25,346 | 330,279 | 52,946 |
+| 10% random bytes, 64 KB | 13,237 | 229,147 | 31,140 | 49,546 | 399,328 | 53,320 |
+| 10% control bytes, 4 KB | 857 | 14,900 | 1,917 | 1,787 | 27,306 | 3,435 |
+| bytes from `0x80` up, 4 KB | 1,737 | 27,142 | 1,908 | 3,241 | 56,414 | 3,452 |
 
 Apple M4 Pro (macOS 26) and Intel Core i9-9980HK (macOS 15, x86-64), Apple clang 17.0.0 with
 `-O3 -DNDEBUG`.
@@ -120,10 +122,11 @@ cmake --build build --target repr_bench
 ./build/repr_bench
 ```
 
-From 256 bytes up `repr` is ahead on every row; at 16 bytes the two are level on the M4 Pro and
-`CEscape` is ahead on the i9. With `max_size` the elided middle is skipped by arithmetic, so the
-cost of a truncated call does not grow with the input. `repr_bench` also times a hand-written
-loop that writes the same text, and `friendly=false`.
+`repr` takes 3.4 to 27 times less time than the loop on the M4 Pro and 2.8 to 21.5 times less on
+the i9. From 256 bytes up it is ahead of `CEscape` on every row (1.1 to 4.4 times on the M4 Pro, 1.1
+to 3.4 times on the i9; the rows of bytes from `0x80` up and of random bytes are the closest). At 16
+bytes `CEscape` is ahead (1.6 times on the M4 Pro, 1.8 times on the i9). With `max_size` the elided
+middle is skipped by arithmetic, so the cost of a truncated call does not grow with the input.
 
 ## 📚 Documentation
 
