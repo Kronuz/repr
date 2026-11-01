@@ -13,7 +13,7 @@ repr.cc                      The one compiled function: the truncation window, q
 test/test.cc                 Runnable smoke test: passthrough, escapes, hex, quote modes, non-friendly, NULs, overloads, truncation.
 test/diff_test.cc            Differential test of repr() against test/repr_old.cc.
 test/repr_old.cc             Frozen Xapiand implementation, the differential test's oracle. Do not edit.
-bench/bench.cc               Benchmark (REPR_BUILD_BENCH=ON): repr() against repr_old and, when available, absl::CEscape.
+bench/bench.cc               Benchmark (REPR_BUILD_BENCH=ON): repr() against repr_old and, when available, absl::CEscape; edge rows for 1 to 16 printable bytes without a quote and for friendly=false.
 examples/demo.cc             A runnable tour (not a test).
 CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest tests `repr`, `repr_diff` and their portable-backend twins `repr_swar`, `repr_diff_swar`.
 LICENSE                      MIT, Copyright (c) 2015-2019 Dubalu LLC.
