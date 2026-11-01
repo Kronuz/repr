@@ -77,7 +77,23 @@ reference only. Run the benchmark with:
 cmake -B build -DREPR_BUILD_BENCH=ON && cmake --build build && ./build/repr_bench
 ```
 
-[CHANGELOG.md](CHANGELOG.md) has the history of these numbers.
+Time per call, `-O3`, Apple clang 17, on an Apple M4 Pro and an Intel i9-9980HK
+(minimum over interleaved samples; `repr_bench` prints the same rows):
+
+| input | M4 Pro: `repr` / `absl::CEscape` | i9-9980HK: `repr` / `absl::CEscape` |
+|---|---:|---:|
+| printable 16 B | 10 ns / 10 ns | 26 ns / 16 ns |
+| printable 256 B | 50 ns / 181 ns | 165 ns / 373 ns |
+| printable 4 KB | 450 ns / 2.2 us | 933 ns / 4.0 us |
+| printable 64 KB | 7.5 us / 35.2 us | 25.1 us / 63.7 us |
+| mixed 10% 64 KB | 12.8 us / 35.6 us | 46.5 us / 61.9 us |
+| 10% control bytes, 4 KB | 832 ns / 2.2 us | 1.7 us / 4.1 us |
+| binary 4 KB | 1.7 us / 2.2 us | 3.2 us / 4.0 us |
+
+`absl::CEscape` is faster for inputs of a few bytes (up to 16 on the M4 Pro, up to
+about 40 on the i9). From 256 bytes up, `repr` is ahead on every row measured.
+
+[CHANGELOG.md](CHANGELOG.md) has the speedups over the previous implementation.
 
 ## 📚 Documentation
 
