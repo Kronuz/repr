@@ -66,6 +66,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   # dependency of the library.
   option(REPR_BUILD_BENCH "Build bench/bench.cc (fetches abseil)" OFF)
   if(REPR_BUILD_BENCH)
+    # Abseil needs C++17 or later and every library that uses it must use the same standard.
+    set(CMAKE_CXX_STANDARD 20)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
     set(ABSL_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(abseil
