@@ -3,6 +3,29 @@
 Notable changes to `repr`, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-11-01
+
+### Added
+
+- `bench/bench.cc` has rows for 1, 4, 8 and 16 printable bytes without a quote and for `friendly=false`
+  at 16 B and 4 KB (the audit found regressions on inputs the earlier rows did not cover). The frozen
+  original and `repr` are sampled in turn instead of one after the other, so a drift of the host hits both.
+
+### Measured
+
+Against the frozen original (`test/repr_old.cc`), three runs of `repr_bench` each, `-O3`, Apple clang 17:
+
+| workload | M4 Pro | i9-9980HK |
+|---|---:|---:|
+| printable 1 B | 7.4-7.9 to 8.3-8.6 ns | 18.0-18.8 to 21.1-21.6 ns |
+| printable 4 B, no quote | 9.4-11.1 to 9.8-10.2 ns | 22.9-23.5 to 24.4-25.2 ns |
+| printable 8 B | 3.0x faster | 2.9x faster |
+| printable 16 B | 2.8x-3.2x faster | 3.0x faster |
+| `friendly=false` 16 B | 0.92x-0.99x | 1.18x-1.21x |
+| `friendly=false` 4 KB | 1.00x | 3.0x-3.1x |
+
+The 2026-10-31 table compares with the previous 8-byte kernel, which is not in the repository.
+
 ## 2026-10-31
 
 ### Changed

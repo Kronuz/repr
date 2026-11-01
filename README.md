@@ -93,6 +93,13 @@ Time per call, `-O3`, Apple clang 17, on an Apple M4 Pro and an Intel i9-9980HK
 `absl::CEscape` is faster for inputs of a few bytes (up to 16 on the M4 Pro, up to
 about 40 on the i9). From 256 bytes up, `repr` is ahead on every row measured.
 
+Against the frozen original (`test/repr_old.cc`, which `repr_bench` samples in turn with `repr`;
+three runs agree), 1 printable byte takes 0.4 to 0.9 ns longer on the M4 Pro (7.4 to 8.3 ns; 4 bytes are level)
+and 1 to 4 bytes take 1 to 3 ns longer on the i9 (1 B: 18 to 21 ns, 4 B without a quote: 23 to 25 ns),
+5% to 16% more, the fixed work of the kernel. From 8 bytes up `repr` is 2.8x to 3.5x faster at 8 and 16
+bytes on both machines. `friendly=false` (every byte as `\xNN`) is within 8% of the original
+on the M4 Pro (16 B) and level at 4 KB, and 1.2x (16 B) and 3.0x (4 KB) faster on the i9.
+
 [CHANGELOG.md](CHANGELOG.md) has the speedups over the previous implementation.
 
 ## 📚 Documentation
