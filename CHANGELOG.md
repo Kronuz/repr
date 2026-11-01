@@ -8,8 +8,8 @@ Notable changes to `repr`, newest first. The format follows
 ### Added
 
 - `bench/bench.cc` has rows for 1, 4, 7, 8, 15 and 16 printable bytes (with and without a quote), `max_size=64`
-  on 4 B, and `friendly=false` at 1 B, 16 B and 4 KB (the audit found regressions on inputs the earlier rows did
-  not cover). The frozen original and `repr` are sampled in turn instead of one after the other, so a drift of
+  on 4 B, and `friendly=false` at 1 B, 16 B and 4 KB (the earlier rows missed regressions on these
+  inputs). The frozen original and `repr` are sampled in turn instead of one after the other, so a drift of
   the host hits both, and a column A/A gives how far apart two sets of samples of `repr` are: the noise of the
   row.
 
@@ -85,7 +85,7 @@ repository.
   | `max_size = 64`, 64 KB input | 1.03x | 1.03x |
 
     The 2026-10-30 gains were measured on Apple silicon only; on x86 the same 8-byte
-  kernel in `escape` gained nothing on 64 KB mixed input (audit CR5). Against
+  kernel in `escape` gained nothing on 64 KB mixed input. Against
   `absl::CEscape` (another format), `repr` is 1.3x (binary 4 KB, 64 KB mixed on x86)
   to 5.0x (printable 4 KB) faster for inputs of 256 bytes and up, and slower for
   inputs of a few bytes (up to 16 on the M4 Pro, 0.57x at 1 B; up to about 40 on the

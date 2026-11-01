@@ -16,10 +16,9 @@ test/repr_old.cc             Frozen Xapiand implementation, the differential tes
 bench/bench.cc               Benchmark (REPR_BUILD_BENCH=ON): repr() against repr_old and, when available, absl::CEscape; edge rows for 1 to 16 printable bytes without a quote and for friendly=false.
 examples/demo.cc             A runnable tour (not a test).
 CMakeLists.txt               STATIC library `repr` (+ alias repr::repr); FetchContent char-classify; CTest tests `repr`, `repr_diff` and their portable-backend twins `repr_swar`, `repr_diff_swar`.
-LICENSE                      MIT, Copyright (c) 2015-2019 Dubalu LLC.
+LICENSE                      MIT, Copyright (c) 2026 Germán Méndez Bravo and (c) 2015-2020 Dubalu LLC.
 README.md                    What it is, install, quick start.
 docs/API.md                  The API reference.
-docs/repr.d2                 The README diagram's source (docs/repr.svg is rendered from it).
 ARCHITECTURE.md              Internal design of the escaping pass, sizing, quoting, truncation.
 CHANGELOG.md                 Behavior and performance changes, newest first.
 ```
