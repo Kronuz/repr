@@ -130,6 +130,8 @@ middle is skipped by arithmetic, so the cost of a truncated call does not grow w
 
 ## 📚 Documentation
 
+- [The Bag of Holding](https://kronuz.github.io/blog/bag-of-holding/):
+  the Familiars post that covers `repr` among the small helpers.
 - [docs/API.md](docs/API.md): the overloads and the `friendly`, `quote` and
   `max_size` parameters.
 - [ARCHITECTURE.md](ARCHITECTURE.md): the escaping pass, quoting and truncation.
